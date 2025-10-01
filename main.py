@@ -1,5 +1,5 @@
 from customtkinter import *
-import socket
+from socket import *
 import threading
 
 class MainWindow(CTk):
@@ -7,13 +7,19 @@ class MainWindow(CTk):
         super().__init__()
         self.geometry("400x300")
         self.title("Logitalk")
+        self.label = None
 
-        self.left_frame = CTkFrame(self, width=200, height=260)
+        self.left_frame = CTkFrame(self, width=30, height=300)
         self.left_frame.pack_propagate(False)
-        self.left_frame.configure(width=0)
         self.left_frame.place(x=0, y=0)
         self.is_show_menu = False
         self.speed_animate_menu = -5
+
+        self.button = CTkButton(self, text='▶️', command=self.toogle_show_menu, width=30)
+        self.button.place(x=0, y=0)
+
+        self.chat_field = CTkTextbox(self, width=400, height=260, corner_radius=10)
+        self.chat_field.place(x=0, y=0)
 
         self.label_name = CTkLabel(self.left_frame, text="Ваше ім'я:")
         self.label_name.pack(pady=30)
@@ -23,18 +29,41 @@ class MainWindow(CTk):
 
         self.theme = CTkOptionMenu(self.left_frame, values=["dark", 'light'], command=self.change_theme)
         self.theme.pack(side="bottom", pady=20)
-        
-        self.field = CTkTextbox(self, width=400, height=260, corner_radius=10)
-        self.field.place(x=0, y=0)
-
-        self.button = CTkButton(self, text=">", width=30, command=self.show_menu)
-        self.button.place(x=0, y=0)
 
         self.entry_message = CTkEntry(self, placeholder_text="Введіть повідомлення:", fg_color="darkgray", height=40, width=360)
         self.entry_message.place(x=0, y=260)
 
-        self.send = CTkButton(self, text=">", height=40, width=40)
-        self.send.place(x=360, y=260)
+        self.send = CTkButton(self, text=">", height=40, width=40, command=self.send_message)
+        self.send.place(x=0, y=0)
+        
+        self.username = "Stepan"
+
+        try:
+            self.sock = socket(AF_INET, SOCK_STREAM)
+            self.sock.connect(('localhost', 8888))
+            hello_msg = f"TEXT@{self.username}@[SYSTEM] {self.username} приєднався(лася), до чату!\n"
+            self.sock.send(hello_msg.encode('utf-8'))
+            threading.Thread(target=self.recv_message, daemon=True).start()
+        except Exception as e:
+            self.add_message(f"Не вдалося підключитися до сервера: {e}")
+
+        self.adaptive.ui()
+
+    def toggle_show_menu(self):     
+        if self.is_show_menu:
+            self.is_show_menu = False
+            self.speed_animate_menu *= -1
+            self.button.configure(text="▶️")
+            self.show_menu()
+        else:
+            self.is_show_menu = True
+            self.speed_animate_menu *= -1
+            self.button.configure(text="◀️")
+            self.show_menu()
+            self.label = CTkLabel(self.left_frame, text="Ім'я")
+            self.label.pack(pady=30)
+            self.entry = CTkEntry(self.left_frame)
+            self.entry.pack()
 
     def show_menu(self):
         self.left_frame.configure(width=self.left_frame.winfo_width() + self.speed_animate_menu)
@@ -46,30 +75,25 @@ class MainWindow(CTk):
                 self.label.destroy()
                 self.entry.destroy()
 
-    def toggle_show_menu(self):     
-        if self.is_show_menu == True:
-            self.is_show_menu = False
-            self.speed_animate_menu *= -1
-            self.button.configure(text=">")
-            self.show_menu()
-        else:
-            self.is_show_menu = True
-            self.speed_animate_menu *= -1
-            self.button.configure(text="<")
-            self.show_menu()
-            self.label = CTkLabel(self.left_frame, text="Ім'я")
-            self.label.pack(pady=30)
-            self.entry = CTkEntry(self.left_frame)
-            self.entry.pack()
+    def adaptive_ui(self):
+        self.left_frame.configure(height=self.winfo_height())
+        self.chat_field.place(x=self.left_frame.winfo_width())
+        self.chat_field.configure(width=self.winfo_width() - self.left_frame.winfo_width(),
+                                  height=self.winfo_height() - 40)
+        self.send.place(x=self.winfo_width() - 50, y=self.winfo_height() - 40)
+        self.entry_message.place(x=self.left_frame.winfo_width(), y=self.send.winfo_y())
+        self.entry_message.configure(width=self.winfo_width() - self.left_frame.winfo_width() - self.send.winfo_width())
+
+        self.after(50, self.adaptive_ui)
 
     def change_theme(self, value):
         set_appearance_mode(value)
             
     #додати повідомлення
     def add_message(self, text):
-        self.field.configure(state='normal')
-        self.field.insert(END, f"Я: {text} \n")
-        self.field.configure(state="disable")
+        self.chat_field.configure(state='normal')
+        self.chat_field.insert(END, f"Я: {text} \n")
+        self.chat_field.configure(state="disable")
         
     #надіслати повідомлення
     def send_message(self):
@@ -118,4 +142,4 @@ class MainWindow(CTk):
                 self.add_message(line)
 
 window = MainWindow()
-window.mainloop()
+window.mainloop()    
